@@ -1,144 +1,103 @@
-# Group Cases Project
+# Group Cases Framework
 
-A comprehensive framework for conducting AI-powered group discussions, interviews, brainstorming sessions, and evaluations using TinyTroupe.
+## Overview
 
-## Project Structure
+Group Cases is an advanced collaborative discussion and analysis framework designed to facilitate complex group interactions, knowledge management, and insights generation.
 
-```
-group_cases/
-├── src/                    # Source code
-│   ├── group_discussion.py # Main discussion framework
-│   └── db_utils.py        # Database utilities
-├── examples/              # Example implementations
-│   ├── apartment_ad.py    # Real estate ad creation
-│   ├── product_brainstorm.py  # Feature brainstorming
-│   ├── customer_interview.py  # Customer research
-│   └── ad_evaluation.py   # Advertisement analysis
-├── data/                  # Data storage
-│   └── extractions/       # Extracted results
-├── docs/                  # Documentation
-├── tests/                 # Test cases
-├── .env.example          # Environment variables template
-├── requirements.txt      # Project dependencies
-└── README.md            # Project documentation
-```
+## Key Components
 
-## Quick Start
+### 1. Chat Interface (`tools/chat_interface.py`)
+- Advanced messaging system
+- Support for multiple message types
+- Threading capabilities
+- Reaction mechanisms
+- User activity tracking
 
-1. **Setup Environment**
+### 2. Discussion Analytics (`tools/advanced_analytics.py`)
+- Comprehensive discussion dynamics analysis
+- Participation metrics
+- Topic evolution tracking
+- Sentiment analysis
+- Interaction pattern recognition
+
+### 3. Streamlit Frontend (`src/streamlit_app.py`)
+- Interactive chat interface
+- Real-time message display
+- User customization
+- Potential for analytics visualization
+
+## Installation
+
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Clone the repository
+git clone https://github.com/yourusername/TinyTroupe.git
 
-# Install dependencies
-pip install -r requirements.txt
+# Navigate to the project directory
+cd TinyTroupe
+
+# Install in editable mode
+pip install -e .
 ```
 
-2. **Configure Databases**
-```bash
-# Copy environment template
-cp .env.example .env
+## Usage Examples
 
-# Edit .env with your database credentials
+### Basic Chat Interface
+
+```python
+from group_cases.src.tools.chat_interface import ChatInterface, MessageType
+
+# Initialize chat interface
+chat = ChatInterface()
+
+# Add messages
+chat.add_message(
+    sender="Alice", 
+    content="Hello, everyone!", 
+    msg_type=MessageType.TEXT
+)
+
+# Create a thread
+thread_id = chat.create_thread(0)  # Create thread from first message
+
+# Add reactions
+chat.add_reaction(
+    message_index=0, 
+    user="Bob", 
+    reaction="👍"
+)
 ```
 
-3. **Run Examples**
-```bash
-# Run apartment ad creation
-python examples/apartment_ad.py
+### Advanced Analytics
 
-# Run product brainstorming
-python examples/product_brainstorm.py
-
-# Run customer interview
-python examples/customer_interview.py
-
-# Run ad evaluation
-python examples/ad_evaluation.py
+```python
+# Get discussion analytics
+analytics = chat.get_analytics()
+print(analytics['total_messages'])
+print(analytics['messages_per_user'])
 ```
 
 ## Features
 
-### 1. Discussion Types
-- Focus Groups
-- One-on-One Interviews
-- Product Brainstorming
-- Advertisement Evaluation
-- Custom Discussions
-
-### 2. Agent Management
-- Pre-configured expert agents
-- Custom agent generation
-- Dynamic agent interactions
-
-### 3. Data Management
-- File-based storage (JSON)
-- Database integration (MySQL & PostgreSQL)
-- Rich metadata support
-
-## Usage Examples
-
-### Create an Apartment Advertisement
-```python
-from src.group_discussion import ApartmentAdDiscussion
-
-discussion = ApartmentAdDiscussion("""
-    Modern 1-bedroom apartment...
-    [apartment description]
-""")
-results = discussion.run_discussion()
-discussion.save_results(results, "output.json")
-```
-
-### Brainstorm Product Features
-```python
-from src.group_discussion import ProductBrainstormingDiscussion
-
-discussion = ProductBrainstormingDiscussion(
-    "Product Name",
-    "industry"
-)
-results = discussion.run_discussion(num_steps=4)
-discussion.save_results(results, "features.json")
-```
-
-## Development
-
-### Adding New Discussion Types
-
-1. Create a new class inheriting from `GroupDiscussion`:
-```python
-class NewDiscussionType(GroupDiscussion):
-    def __init__(self, specific_params):
-        super().__init__(
-            "Discussion Name",
-            DiscussionType.CUSTOM
-        )
-        # Add specific initialization
-```
-
-2. Configure extraction and metadata:
-```python
-self.configure_extraction(
-    objective="Your objective",
-    fields=["field1", "field2"]
-)
-```
-
-### Running Tests
-```bash
-python -m pytest tests/
-```
+- 🌐 Flexible Messaging
+- 📊 Advanced Analytics
+- 🧵 Threading Support
+- 😀 Reaction System
+- 🔍 Detailed User Tracking
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## Contact
+
+Your Name - your.email@example.com
+
+Project Link: [https://github.com/yourusername/TinyTroupe](https://github.com/yourusername/TinyTroupe)
