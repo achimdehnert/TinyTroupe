@@ -1,75 +1,59 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Product Brinstorming
-# 
-# Can we use TinyTroupe to brainstorm product ideas?
-
-# In[1]:
-
-
-import json
 import sys
 sys.path.append('..')
 
-import tinytroupe
-from tinytroupe.agent import TinyPerson
-from tinytroupe.environment import TinyWorld, TinySocialNetwork
-from tinytroupe.examples import *
+from focus_group_manager import FocusGroupManager
 
+class ProductBrainstorming(FocusGroupManager):
+    def __init__(self, product_name: str, industry: str):
+        super().__init__(f"{product_name} Brainstorming Group")
+        self.product_name = product_name
+        self.industry = industry
+        
+        self.set_situation(
+        f"""
+        We are brainstorming ideas for new features to add to {product_name}. The focus is on making
+        {industry} professionals more productive by leveraging the latest AI technologies.
+        Please avoid obvious ideas and focus on innovative solutions that could transform how people work.
+        """)
+        
+        self.set_task(
+        """
+        Please start the discussion by proposing and discussing potential AI feature ideas.
+        Consider both the technical feasibility and the practical benefits for users.
+        """)
+        
+    def prepare_metadata(self) -> dict:
+        """Prepare metadata for database storage"""
+        return {
+            "product_name": self.product_name,
+            "industry": self.industry,
+            "brainstorm_type": "feature_ideas",
+            "focus": "AI integration",
+            "target_audience": f"{self.industry} professionals"
+        }
+        
+    def run(self):
+        """Run the product brainstorming session"""
+        # Run focus group with Lisa as rapporteur
+        extraction_result = self.run_focus_group(
+            num_steps=4,
+            extraction_objective="Summarize the ideas that the group came up with, explaining each idea as an item of a list. " \
+                               "Describe in details the benefits and drawbacks of each.",
+            rapporteur_name="Lisa"
+        )
+        
+        # Save results
+        self.save_results(
+            extraction_result,
+            f"data/extractions/{self.product_name.lower()}_brainstorming.extraction.json"
+        )
 
-# In[2]:
+def main():
+    brainstorming = ProductBrainstorming("Microsoft Word", "office productivity")
+    brainstorming.run()
 
-
-world = TinyWorld("Focus group", [create_lisa_the_data_scientist(), create_oscar_the_architect(), create_marcos_the_physician()])
-
-
-# In[3]:
-
-
-world.broadcast("""
-             Folks, we need to brainstorm ideas for a new product. Your mission is to discuss potential AI feature ideas
-             to add to Microsoft Word. In general, we want features that make you or your industry more productive,
-             taking advantage of all the latest AI technologies. Also avoid obvious ideas, like summarization or
-            translation.
-
-             Please start the discussion now.
-             """)
-
-
-# In[4]:
-
-
-world.run(4)
-
-
-# In[6]:
-
-
-rapporteur = world.get_agent_by_name("Lisa")
-
-
-# In[7]:
-
-
-rapporteur.listen_and_act("Can you please summarize the ideas that the group came up with?")
-
-
-# In[ ]:
-
-
-from tinytroupe.extraction import ResultsExtractor
-
-extractor = ResultsExtractor()
-
-extractor.extract_results_from_agent(rapporteur, 
-                          extraction_objective="Summarize the the ideas that the group came up with, explaining each idea as an item of a list." \
-                                               "Describe in details the benefits and drawbacks of each.", 
-                          situation="A focus group to brainstorm ideas for a new product.")
-
-
-# In[ ]:
-
-
-
-
+if __name__ == "__main__":
+    main()

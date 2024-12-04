@@ -37,10 +37,13 @@ def create_mysql_tables(conn):
     ''')
     
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ad_copies (
+        CREATE TABLE IF NOT EXISTS agent_usecases (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            agent_name VARCHAR(255),
+            usecase_type VARCHAR(255),
+            content TEXT,
+            metadata JSON,
             source VARCHAR(255),
-            ad_copy TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -62,10 +65,13 @@ def create_postgres_tables(conn):
     ''')
     
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ad_copies (
+        CREATE TABLE IF NOT EXISTS agent_usecases (
             id SERIAL PRIMARY KEY,
+            agent_name VARCHAR(255),
+            usecase_type VARCHAR(255),
+            content TEXT,
+            metadata JSONB,
             source VARCHAR(255),
-            ad_copy TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -85,10 +91,17 @@ def insert_data(mysql_conn, postgres_conn, data):
                 (agent_name, insight['main_point'])
             )
     
-    # Insert ad copy
+    # Insert usecase data
+    metadata = json.dumps({
+        "property_type": "apartment",
+        "target_audience": "medical students",
+        "location_features": ["near Medicine School"],
+        "amenities": ["washing machine/dryer", "fully furnished"]
+    })
+    
     mysql_cursor.execute(
-        'INSERT INTO ad_copies (source, ad_copy) VALUES (%s, %s)',
-        ('Focus group', data['world_extraction']['Focus group']['ad_copy'])
+        'INSERT INTO agent_usecases (agent_name, usecase_type, content, metadata, source) VALUES (%s, %s, %s, %s, %s)',
+        ('Lisa', 'rental_ad', data['world_extraction']['Focus group']['ad_copy'], metadata, 'Focus group')
     )
     
     mysql_conn.commit()
@@ -105,10 +118,10 @@ def insert_data(mysql_conn, postgres_conn, data):
                 (agent_name, insight['main_point'])
             )
     
-    # Insert ad copy
+    # Insert usecase data
     postgres_cursor.execute(
-        'INSERT INTO ad_copies (source, ad_copy) VALUES (%s, %s)',
-        ('Focus group', data['world_extraction']['Focus group']['ad_copy'])
+        'INSERT INTO agent_usecases (agent_name, usecase_type, content, metadata, source) VALUES (%s, %s, %s, %s, %s)',
+        ('Lisa', 'rental_ad', data['world_extraction']['Focus group']['ad_copy'], metadata, 'Focus group')
     )
     
     postgres_conn.commit()
