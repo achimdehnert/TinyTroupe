@@ -19,7 +19,6 @@ from typing import Dict, Any, List
 import altair as alt
 from textblob import TextBlob
 from group_cases.src.tools.chat_interface import ChatInterface, MessageType
-from group_cases.src.tools.advanced_analytics import DiscussionAnalytics
 from enhanced_group_memory.src.core.characters import (
     Character, 
     CharacterGroup,
@@ -28,14 +27,7 @@ from enhanced_group_memory.src.core.characters import (
 )
 from enhanced_group_memory.src.core.discussion import (
     GroupDiscussion,
-    DiscussionType,
-    MessageType as CoreMessageType
-)
-from group_cases.src.group_discussion import (
-    ApartmentAdDiscussion,
-    ProductBrainstormingDiscussion,
-    CustomerInterviewDiscussion,
-    AdEvaluationDiscussion
+    DiscussionType
 )
 
 def init_session_state():
@@ -58,6 +50,28 @@ def init_session_state():
         st.session_state.selected_characters = []
     if 'character_group' not in st.session_state:
         st.session_state.character_group = None
+    if 'discussion_obj' not in st.session_state:
+        st.session_state.discussion_obj = None
+    
+    # Initialize available characters
+    if 'character_creators' not in st.session_state:
+        st.session_state.character_creators = {
+            'Lisa': create_lisa_the_data_scientist,
+            'Oscar': create_oscar_the_architect
+        }
+    
+    # Initialize scenarios
+    if 'scenarios' not in st.session_state:
+        st.session_state.scenarios = {
+            'Data Architecture': {
+                'topic': 'Designing Data-Driven Architecture',
+                'prompt': 'How can we integrate data analytics into architectural design to create smarter buildings?'
+            },
+            'Smart Cities': {
+                'topic': 'Future of Smart Cities',
+                'prompt': 'What role should data analysis play in urban development and city planning?'
+            }
+        }
 
 def analyze_sentiment(text: str) -> float:
     """Analyze sentiment of text using TextBlob."""
@@ -220,17 +234,17 @@ def main():
     st.sidebar.header("Select Characters")
     
     # Create character instances with unique IDs
-    available_characters = {
-        "Lisa (Data Scientist)": create_lisa_the_data_scientist(),
-        "Oscar (Architect)": create_oscar_the_architect()
-    }
+    available_characters = st.session_state.character_creators
     
     # Store original names for display
     display_names = {}
-    for char_name, char in available_characters.items():
-        # Get the base name without unique ID
-        base_name = char.name.split(' ')[0]  # Just get "Lisa" or "Oscar"
-        display_names[char.name] = base_name
+    character_info = {}
+    
+    # Create characters once to get their full names and info
+    for short_name, creator_func in available_characters.items():
+        character = creator_func()
+        display_names[character.name] = short_name
+        character_info[character.name] = character.occupation
     
     selected_chars = st.sidebar.multiselect(
         "Choose characters for the discussion:",
@@ -240,7 +254,7 @@ def main():
     
     # Update selected characters
     st.session_state.selected_characters = [
-        available_characters[char_name] for char_name in selected_chars
+        available_characters[char_name]() for char_name in selected_chars
     ]
     
     # Discussion topic and start button
@@ -250,8 +264,9 @@ def main():
     if 'discussion_obj' not in st.session_state:
         st.session_state.discussion_obj = None
         
-    topic = st.sidebar.text_input("Discussion Topic", key='topic_input')
-    initial_prompt = st.sidebar.text_area("Initial Prompt")
+    scenario = st.sidebar.selectbox("Select a scenario", list(st.session_state.scenarios.keys()))
+    topic = st.session_state.scenarios[scenario]["topic"]
+    initial_prompt = st.session_state.scenarios[scenario]["prompt"]
     
     if st.sidebar.button("Start Discussion") and len(selected_chars) > 0 and topic and initial_prompt:
         # Create character group and discussion object
@@ -269,7 +284,7 @@ def main():
         st.session_state.discussion_obj.chat_interface.add_message(
             sender="System",
             content=initial_prompt,
-            msg_type=CoreMessageType.SYSTEM
+            msg_type=MessageType.SYSTEM
         )
         
         st.session_state.discussion_started = True
@@ -286,11 +301,45 @@ def main():
                 sender = display_names[sender]
             with st.chat_message(sender.lower()):
                 if sender in display_names:
-                    st.write(f"**{sender}** ({available_characters[sender].occupation}):")
+                    st.write(f"**{sender}** ({character_info[sender]}):")
                 st.write(message.content)
         
-        # User input
+        # Add continue button
+        continue_chat = st.button("Continue Discussion")
+        
+        # Add user input
         user_input = st.chat_input("Your message")
+        
+        if continue_chat:
+            # Generate a continuation prompt based on the discussion context
+            last_messages = st.session_state.discussion_obj.chat_interface.messages[-3:]
+            context = "\n".join([f"{msg.sender}: {msg.content}" for msg in last_messages])
+            continuation_prompt = f"Based on the recent discussion:\n{context}\n\nPlease continue the conversation."
+            
+            # Get responses from characters
+            for char in st.session_state.selected_characters:
+                response = st.session_state.character_group._generate_character_response(
+                    char, 
+                    continuation_prompt,
+                    st.session_state.discussion_obj
+                )
+                
+                display_name = display_names.get(char.name, char.name)
+                with st.chat_message(display_name.lower()):
+                    st.write(f"**{display_name}** ({char.occupation}):")
+                    if response:
+                        st.write(response)
+                        # Add character response to discussion
+                        st.session_state.discussion_obj.chat_interface.add_message(
+                            sender=char.name,
+                            content=response,
+                            msg_type=MessageType.TEXT
+                        )
+                    else:
+                        st.error("No response generated")
+            
+            st.experimental_rerun()
+        
         if user_input:
             # Add user message to discussion
             st.session_state.discussion_obj.chat_interface.add_message(
@@ -311,7 +360,7 @@ def main():
                     st.session_state.discussion_obj
                 )
                 
-                display_name = display_names[char.name]
+                display_name = display_names.get(char.name, char.name)
                 with st.chat_message(display_name.lower()):
                     st.write(f"**{display_name}** ({char.occupation}):")
                     if response:
