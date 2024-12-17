@@ -39,6 +39,7 @@ We are releasing *TinyTroupe* at a relativelly early stage, with considerable wo
 - 📜 [Citing TinyTroupe](#how-to-cite-tinytroupe)
 - ⚖️ [Legal Disclaimer](#legal-disclaimer)
 - ™️ [Trademarks](#trademarks)
+- 📊 [Analytics Dashboard](#analytics-dashboard)
 
 
 ## Examples
@@ -175,6 +176,47 @@ The project is structured as follows:
   - `/data`: any data used by the examples or the library.
   - `/docs`: documentation for the project.
 
+## Analytics Dashboard
+
+TinyTroupe now includes a powerful analytics dashboard in its Streamlit interface that provides real-time insights into character interactions. The dashboard offers:
+
+### Participation Overview
+- Total message count
+- Active user tracking
+- Message distribution per character
+- Average reactions per message
+
+### Sentiment Analysis
+- Real-time sentiment tracking over time
+- Visualization of emotional trends in discussions
+
+### Topic Evolution
+- Key terms and topics discussed
+- Topic timeline with sentiment context
+- Trend analysis of conversation themes
+
+### Interaction Network
+- Character interaction heatmap
+- Communication pattern visualization
+- Relationship strength indicators
+
+To use the analytics dashboard:
+1. Launch the Streamlit app
+2. Start a discussion with characters
+3. Click "Show Analytics" in the sidebar
+4. Navigate through different analytics tabs
+
+The analytics system helps understand:
+- Character engagement levels
+- Emotional dynamics of conversations
+- Topic progression and focus
+- Interaction patterns between characters
+
+This feature is particularly useful for:
+- Analyzing group dynamics
+- Understanding character behavior patterns
+- Identifying conversation trends
+- Evaluating interaction effectiveness
 
 ## Using the Library
 
@@ -419,5 +461,3 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
-
-

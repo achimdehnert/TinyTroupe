@@ -278,27 +278,69 @@ class ChatInterface:
         raise ValueError(f"Unsupported export format: {format}")
         
     def get_analytics(self) -> Dict[str, Any]:
-        """Get basic chat analytics."""
+        """Get analytics data for the chat."""
         analytics = {
             "total_messages": len(self.messages),
             "active_users": len(self.active_users),
-            "total_threads": len(self.threads),
+            "total_threads": 0,  
             "messages_per_user": {},
             "reactions_per_message": [],
-            "thread_sizes": {}
+            "interaction_patterns": {
+                "interaction_matrix": {}
+            },
+            "topic_evolution": {
+                "windows": []
+            }
         }
         
-        # Messages per user
-        for user, data in self.active_users.items():
-            analytics["messages_per_user"][user] = data["message_count"]
+        # Calculate messages per user
+        for message in self.messages:
+            if message.sender not in analytics["messages_per_user"]:
+                analytics["messages_per_user"][message.sender] = 0
+            analytics["messages_per_user"][message.sender] += 1
             
-        # Reactions per message
-        for msg in self.messages:
-            total_reactions = sum(len(users) for users in msg.reactions.values())
-            analytics["reactions_per_message"].append(total_reactions)
+            # Count reactions
+            if message.reactions:
+                analytics["reactions_per_message"].append(len(message.reactions))
+                
+        # Calculate interaction patterns
+        for message in self.messages:
+            sender = message.sender
+            if sender not in analytics["interaction_patterns"]["interaction_matrix"]:
+                analytics["interaction_patterns"]["interaction_matrix"][sender] = {}
             
-        # Thread sizes
-        for thread_id, messages in self.threads.items():
-            analytics["thread_sizes"][thread_id] = len(messages)
-            
+            for other_user in self.active_users:
+                if other_user != sender:
+                    if other_user not in analytics["interaction_patterns"]["interaction_matrix"][sender]:
+                        analytics["interaction_patterns"]["interaction_matrix"][sender][other_user] = 0
+                    analytics["interaction_patterns"]["interaction_matrix"][sender][other_user] += 1
+        
+        # Calculate topic evolution
+        window_size = 3  
+        for i in range(0, len(self.messages), window_size):
+            window_messages = self.messages[i:i+window_size]
+            if window_messages:
+                window_text = " ".join([msg.content for msg in window_messages])
+                sentiment = "positive" if "good" in window_text.lower() else "negative"
+                
+                words = window_text.lower().split()
+                word_freq = {}
+                for word in words:
+                    if len(word) > 3:  
+                        if word not in word_freq:
+                            word_freq[word] = 0
+                        word_freq[word] += 1
+                
+                analytics["topic_evolution"]["windows"].append({
+                    "timestamp_start": window_messages[0].timestamp.isoformat(),
+                    "timestamp_end": window_messages[-1].timestamp.isoformat(),
+                    "key_terms": dict(sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:5]),
+                    "sentiment": sentiment
+                })
+        
         return analytics
+
+def analyze_sentiment(text: str) -> str:
+    # This is a placeholder for a sentiment analysis function
+    # You can replace this with a real sentiment analysis function
+    return "positive" if "good" in text else "negative"

@@ -4,6 +4,8 @@ Streamlit frontend for the chat interface and analytics.
 import os
 import sys
 from pathlib import Path
+import json
+from datetime import datetime, timedelta
 
 # Determine the project root directory
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -12,237 +14,328 @@ sys.path.insert(0, project_root)
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
 import pandas as pd
 from typing import Dict, Any, List
 import altair as alt
-from TinyTroupe.group_cases.src.tools.chat_interface import ChatInterface, MessageType
-from TinyTroupe.group_cases.src.tools.advanced_analytics import DiscussionAnalytics
+from textblob import TextBlob
+from group_cases.src.tools.chat_interface import ChatInterface, MessageType
+from group_cases.src.tools.advanced_analytics import DiscussionAnalytics
+from enhanced_group_memory.src.core.characters import (
+    Character, 
+    CharacterGroup,
+    create_lisa_the_data_scientist,
+    create_oscar_the_architect
+)
+from enhanced_group_memory.src.core.discussion import (
+    GroupDiscussion,
+    DiscussionType,
+    MessageType as CoreMessageType
+)
+from group_cases.src.group_discussion import (
+    ApartmentAdDiscussion,
+    ProductBrainstormingDiscussion,
+    CustomerInterviewDiscussion,
+    AdEvaluationDiscussion
+)
 
 def init_session_state():
     """Initialize session state variables."""
+    if 'discussion' not in st.session_state:
+        st.session_state.discussion = None
     if 'chat_interface' not in st.session_state:
         st.session_state.chat_interface = ChatInterface()
     if 'current_user' not in st.session_state:
         st.session_state.current_user = "User"
-    if 'current_thread' not in st.session_state:
-        st.session_state.current_thread = None
     if 'show_analytics' not in st.session_state:
         st.session_state.show_analytics = False
+    if 'show_results' not in st.session_state:
+        st.session_state.show_results = False
+    if 'discussion_started' not in st.session_state:
+        st.session_state.discussion_started = False
+    if 'sentiment_history' not in st.session_state:
+        st.session_state.sentiment_history = []
+    if 'selected_characters' not in st.session_state:
+        st.session_state.selected_characters = []
+    if 'character_group' not in st.session_state:
+        st.session_state.character_group = None
+
+def analyze_sentiment(text: str) -> float:
+    """Analyze sentiment of text using TextBlob."""
+    blob = TextBlob(text)
+    return blob.sentiment.polarity
 
 def render_message(message: Any):
     """Render a chat message."""
     with st.container():
         col1, col2 = st.columns([1, 4])
-        
         with col1:
             st.write(f"**{message.sender}**")
             st.caption(message.timestamp.strftime("%H:%M:%S"))
-            
         with col2:
-            message_container = st.container()
-            with message_container:
-                st.markdown(message.content)
-                
-                if message.reactions:
-                    reaction_text = " | ".join(
-                        [f"{r} ({len(users)})" for r, users in message.reactions.items()]
-                    )
-                    st.caption(f"Reactions: {reaction_text}")
-                    
-                if message.thread_id:
-                    st.caption(f"Thread: {message.thread_id}")
+            st.markdown(message.content)
+            sentiment = analyze_sentiment(message.content)
+            sentiment_color = "🟢" if sentiment > 0 else "🔴" if sentiment < 0 else "⚪"
+            st.caption(f"Sentiment: {sentiment_color} ({sentiment:.2f})")
+            if message.reactions:
+                reaction_text = " | ".join(
+                    [f"{r} ({len(users)})" for r, users in message.reactions.items()]
+                )
+                st.caption(f"Reactions: {reaction_text}")
+
+def render_results():
+    """Render discussion results."""
+    if not st.session_state.discussion:
+        return
+    
+    st.subheader("Discussion Results")
+    results = st.session_state.discussion.get_results()
+    if results:
+        # Create tabs for different result views
+        result_tabs = st.tabs(["Summary", "Raw Data", "Export"])
+        
+        with result_tabs[0]:
+            st.markdown("### Key Points")
+            for key, value in results.items():
+                st.markdown(f"**{key}:**")
+                if isinstance(value, list):
+                    for item in value:
+                        st.markdown(f"- {item}")
+                else:
+                    st.markdown(value)
+        
+        with result_tabs[1]:
+            st.json(results)
+        
+        with result_tabs[2]:
+            st.download_button(
+                "Download Results (JSON)",
+                data=json.dumps(results, indent=2),
+                file_name=f"discussion_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json"
+            )
 
 def render_analytics_dashboard():
     """Render analytics dashboard."""
-    analytics = st.session_state.chat_interface.get_analytics()
+    if not st.session_state.discussion_obj:
+        st.warning("Start a discussion to see analytics.")
+        return
+        
+    analytics = st.session_state.discussion_obj.chat_interface.get_analytics()
     
-    # Participation Overview
-    st.subheader("Participation Overview")
-    participation = analytics["participation_metrics"]
+    # Create tabs for different analytics views
+    analytics_tabs = st.tabs(["Overview", "Sentiment Analysis", "Topic Evolution", "Interaction Network"])
     
-    # Convert participation data to DataFrame
-    participation_df = pd.DataFrame([
-        {
-            "User": user,
-            "Messages": data["message_count"],
-            "Avg Words": data["avg_message_length"],
-            "Response Time": data.get("avg_response_time", 0)
-        }
-        for user, data in participation.items()
-    ])
+    with analytics_tabs[0]:
+        st.subheader("Participation Overview")
+        
+        # Display participation metrics in a grid
+        metrics_cols = st.columns(2)
+        with metrics_cols[0]:
+            st.metric("Total Messages", analytics.get("total_messages", 0))
+        with metrics_cols[1]:
+            st.metric("Active Users", analytics.get("active_users", 0))
+        if analytics.get("reactions_per_message"):
+            avg_reactions = sum(analytics["reactions_per_message"]) / len(analytics["reactions_per_message"])
+            st.metric("Avg Reactions", f"{avg_reactions:.2f}")
+        else:
+            st.metric("Avg Reactions", "0")
+        
+        # Convert participation data to DataFrame
+        messages_per_user = analytics.get("messages_per_user", {})
+        if messages_per_user:
+            participation_df = pd.DataFrame([
+                {"User": user, "Messages": count}
+                for user, count in messages_per_user.items()
+            ])
+            st.bar_chart(participation_df.set_index("User"))
+        else:
+            st.info("No messages yet.")
     
-    col1, col2 = st.columns(2)
+    with analytics_tabs[1]:
+        st.subheader("Sentiment Analysis")
+        topic_evolution = analytics.get("topic_evolution", {}).get("windows", [])
+        if topic_evolution:
+            sentiment_df = pd.DataFrame([
+                {
+                    "Time": window["timestamp_start"],
+                    "Sentiment": 1 if window["sentiment"] == "positive" else -1
+                }
+                for window in topic_evolution
+            ])
+            if not sentiment_df.empty:
+                st.line_chart(sentiment_df.set_index("Time"))
+        else:
+            st.info("Not enough messages for sentiment analysis.")
     
-    with col1:
-        fig = px.bar(
-            participation_df,
-            x="User",
-            y="Messages",
-            title="Message Count by User"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-    with col2:
-        fig = px.scatter(
-            participation_df,
-            x="Messages",
-            y="Avg Words",
-            text="User",
-            title="Message Count vs Average Length"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-    # Topic Evolution
-    st.subheader("Topic Evolution")
-    topic_evolution = analytics.get("topic_evolution", {}).get("windows", [])
-    if topic_evolution:
-        topic_df = pd.DataFrame([
-            {
-                "Time": window["timestamp_start"],
-                "Topics": ", ".join(list(window["key_terms"].keys())[:3]),
-                "Sentiment": window["sentiment"]
-            }
-            for window in topic_evolution
-        ])
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=topic_df["Time"],
-            y=topic_df["Sentiment"],
-            mode='lines+markers',
-            name='Sentiment'
-        ))
-        fig.update_layout(title="Topic Evolution and Sentiment")
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.table(topic_df)
-        
-    # Interaction Network
-    st.subheader("Interaction Network")
-    interactions = analytics.get("interaction_patterns", {}).get("interaction_matrix", {})
-    if interactions:
-        interaction_df = pd.DataFrame([
-            {
-                "From": user1,
-                "To": user2,
-                "Count": count
-            }
-            for user1, targets in interactions.items()
-            for user2, count in targets.items()
-        ])
-        
-        if not interaction_df.empty:
-            fig = px.scatter(
-                interaction_df,
-                x="From",
-                y="To",
-                size="Count",
-                title="Interaction Network"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    with analytics_tabs[2]:
+        st.subheader("Topic Evolution")
+        topic_evolution = analytics.get("topic_evolution", {}).get("windows", [])
+        if topic_evolution:
+            topic_df = pd.DataFrame([
+                {
+                    "Time": window["timestamp_start"],
+                    "Topics": ", ".join(list(window["key_terms"].keys())[:3]),
+                    "Sentiment": window["sentiment"]
+                }
+                for window in topic_evolution
+            ])
+            
+            if not topic_df.empty:
+                st.dataframe(topic_df)
+        else:
+            st.info("Not enough messages for topic analysis.")
+    
+    with analytics_tabs[3]:
+        st.subheader("Interaction Network")
+        interactions = analytics.get("interaction_patterns", {}).get("interaction_matrix", {})
+        if interactions and len(interactions) > 1:  # Need at least 2 users for interactions
+            interaction_df = pd.DataFrame([
+                {
+                    "From": user1,
+                    "To": user2,
+                    "Count": count
+                }
+                for user1, targets in interactions.items()
+                for user2, count in targets.items()
+            ])
+            
+            if not interaction_df.empty:
+                # Create a heatmap of interactions
+                pivot_df = interaction_df.pivot(index="From", columns="To", values="Count").fillna(0)
+                fig = px.imshow(
+                    pivot_df,
+                    labels=dict(x="To", y="From", color="Interactions"),
+                    title="Interaction Heatmap"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Not enough interactions to display network.")
 
 def main():
     """Main Streamlit app."""
-    st.set_page_config(
-        page_title="Chat Analytics Dashboard",
-        page_icon="📊",
-        layout="wide"
+    st.title("Enhanced Group Discussion")
+    init_session_state()
+
+    # Character selection
+    st.sidebar.header("Select Characters")
+    
+    # Create character instances with unique IDs
+    available_characters = {
+        "Lisa (Data Scientist)": create_lisa_the_data_scientist(),
+        "Oscar (Architect)": create_oscar_the_architect()
+    }
+    
+    # Store original names for display
+    display_names = {}
+    for char_name, char in available_characters.items():
+        # Get the base name without unique ID
+        base_name = char.name.split(' ')[0]  # Just get "Lisa" or "Oscar"
+        display_names[char.name] = base_name
+    
+    selected_chars = st.sidebar.multiselect(
+        "Choose characters for the discussion:",
+        options=list(available_characters.keys()),
+        default=[]
     )
     
-    init_session_state()
+    # Update selected characters
+    st.session_state.selected_characters = [
+        available_characters[char_name] for char_name in selected_chars
+    ]
     
-    # Sidebar
-    with st.sidebar:
-        st.title("Chat Settings")
-        st.session_state.current_user = st.text_input(
-            "Your Name",
-            value=st.session_state.current_user
+    # Discussion topic and start button
+    st.sidebar.header("Discussion")
+    if 'topic' not in st.session_state:
+        st.session_state.topic = ""
+    if 'discussion_obj' not in st.session_state:
+        st.session_state.discussion_obj = None
+        
+    topic = st.sidebar.text_input("Discussion Topic", key='topic_input')
+    initial_prompt = st.sidebar.text_area("Initial Prompt")
+    
+    if st.sidebar.button("Start Discussion") and len(selected_chars) > 0 and topic and initial_prompt:
+        # Create character group and discussion object
+        st.session_state.character_group = CharacterGroup(st.session_state.selected_characters)
+        st.session_state.topic = topic
+        
+        # Create a discussion object with the proper type and context
+        st.session_state.discussion_obj = GroupDiscussion(
+            discussion_name=topic,
+            discussion_type=DiscussionType.CUSTOM,
+            context=initial_prompt
         )
         
-        # Thread selection
-        threads = list(st.session_state.chat_interface.threads.keys())
-        if threads:
-            st.session_state.current_thread = st.selectbox(
-                "Select Thread",
-                ["None"] + threads
-            )
-            if st.session_state.current_thread == "None":
-                st.session_state.current_thread = None
-                
-        # Toggle analytics
-        st.session_state.show_analytics = st.checkbox(
-            "Show Analytics",
-            value=st.session_state.show_analytics
+        # Add the initial prompt as a system message
+        st.session_state.discussion_obj.chat_interface.add_message(
+            sender="System",
+            content=initial_prompt,
+            msg_type=CoreMessageType.SYSTEM
         )
         
-        # Export options
-        if st.button("Export Chat"):
-            export_format = st.radio(
-                "Export Format",
-                ["json", "markdown", "html"]
-            )
-            exported = st.session_state.chat_interface.export_chat_history(
-                format=export_format,
-                include_analytics=True
-            )
-            st.download_button(
-                "Download Export",
-                exported,
-                file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format}",
-                mime="text/plain"
-            )
+        st.session_state.discussion_started = True
+        st.experimental_rerun()
     
-    # Main chat area
-    st.title("Chat Interface")
-    
-    # Message input
-    with st.container():
-        message = st.text_area("Message", height=100)
-        col1, col2, col3 = st.columns([2, 1, 1])
+    # Show discussion area if started
+    if st.session_state.discussion_started and st.session_state.character_group:
+        st.subheader(f"Discussion: {st.session_state.topic}")
         
-        with col1:
-            if st.button("Send"):
-                if message.strip():
-                    st.session_state.chat_interface.add_message(
-                        sender=st.session_state.current_user,
-                        content=message,
-                        thread_id=st.session_state.current_thread
-                    )
-                    st.experimental_rerun()
-                    
-        with col2:
-            msg_type = st.selectbox(
-                "Message Type",
-                [t.value for t in MessageType]
+        # Display messages from chat history
+        for message in st.session_state.discussion_obj.chat_interface.messages:
+            sender = message.sender
+            if sender in display_names:
+                sender = display_names[sender]
+            with st.chat_message(sender.lower()):
+                if sender in display_names:
+                    st.write(f"**{sender}** ({available_characters[sender].occupation}):")
+                st.write(message.content)
+        
+        # User input
+        user_input = st.chat_input("Your message")
+        if user_input:
+            # Add user message to discussion
+            st.session_state.discussion_obj.chat_interface.add_message(
+                sender="User",
+                content=user_input,
+                msg_type=MessageType.TEXT
             )
             
-        with col3:
-            if st.button("Create Thread"):
-                if len(st.session_state.chat_interface.messages) > 0:
-                    thread_id = st.session_state.chat_interface.create_thread(
-                        len(st.session_state.chat_interface.messages) - 1
-                    )
-                    if thread_id:
-                        st.session_state.current_thread = thread_id
-                        st.experimental_rerun()
+            # Display user message
+            with st.chat_message("user"):
+                st.write(user_input)
+            
+            # Get responses from characters
+            for char in st.session_state.selected_characters:
+                response = st.session_state.character_group._generate_character_response(
+                    char, 
+                    user_input,
+                    st.session_state.discussion_obj
+                )
+                
+                display_name = display_names[char.name]
+                with st.chat_message(display_name.lower()):
+                    st.write(f"**{display_name}** ({char.occupation}):")
+                    if response:
+                        st.write(response)
+                        # Add character response to discussion
+                        st.session_state.discussion_obj.chat_interface.add_message(
+                            sender=char.name,
+                            content=response,
+                            msg_type=MessageType.TEXT
+                        )
+                    else:
+                        st.error("No response generated")
+                
+                # Optional: Show character's recent memory for debugging
+                if st.sidebar.checkbox("Show Character Memory", key=f"show_memory_{char.name}"):
+                    with st.expander(f"{char.name}'s Recent Memory"):
+                        recent_memory = char.tiny_person.episodic_memory.retrieve_recent()
+                        for memory in recent_memory:
+                            st.write(memory)
     
-    # Chat history
-    st.subheader("Chat History")
-    messages = (
-        st.session_state.chat_interface.get_thread_messages(st.session_state.current_thread)
-        if st.session_state.current_thread
-        else st.session_state.chat_interface.messages
-    )
-    
-    for msg in messages:
-        render_message(msg)
-        
-    # Analytics dashboard
-    if st.session_state.show_analytics:
-        st.markdown("---")
-        st.header("Analytics Dashboard")
-        render_analytics_dashboard()
+    # Show analytics if discussion has started
+    if st.session_state.discussion_started:
+        if st.sidebar.checkbox("Show Analytics"):
+            render_analytics_dashboard()
 
 if __name__ == "__main__":
     main()
