@@ -73,14 +73,27 @@ class GroupDiscussion:
         
     def _get_default_agents(self) -> List[TinyPerson]:
         """Get default agents based on discussion type"""
+        agents = []
+        
+        # Create a unique instance of Lisa for each discussion
         if self.discussion_type == DiscussionType.INTERVIEW:
-            return [create_lisa_the_data_scientist()]  # Single interviewer
+            lisa = create_lisa_the_data_scientist()
+            lisa.name = f"Lisa_{self.discussion_name}"  # Make name unique
+            agents = [lisa]
         else:
-            return [
-                create_lisa_the_data_scientist(),
-                create_oscar_the_architect(),
-                create_marcos_the_physician()
-            ]
+            # Create unique instances for each agent
+            lisa = create_lisa_the_data_scientist()
+            oscar = create_oscar_the_architect()
+            marcos = create_marcos_the_physician()
+            
+            # Make names unique by appending discussion name
+            lisa.name = f"Lisa_{self.discussion_name}"
+            oscar.name = f"Oscar_{self.discussion_name}"
+            marcos.name = f"Marcos_{self.discussion_name}"
+            
+            agents = [lisa, oscar, marcos]
+        
+        return agents
             
     def set_situation(self, situation: str):
         """Set the situation description"""
@@ -100,7 +113,47 @@ class GroupDiscussion:
             "fields": fields,
             "rapporteur_name": rapporteur_name
         })
+
+    def get_results(self) -> Dict[str, Any]:
+        """Extract and return results from the discussion"""
+        # Create an extractor
+        extractor = ResultsExtractor()
         
+        # Extract results based on configuration
+        if self.extraction_config["rapporteur_name"]:
+            rapporteur = next(
+                (agent for agent in self.agents 
+                 if agent.name == self.extraction_config["rapporteur_name"]),
+                None
+            )
+            if rapporteur:
+                results = extractor.extract_results_from_agent(
+                    rapporteur,
+                    extraction_objective=self.extraction_config["objective"],
+                    fields=self.extraction_config["fields"]
+                )
+            else:
+                # Fallback to world extraction if rapporteur not found
+                results = extractor.extract_results_from_world(
+                    self.world,
+                    extraction_objective=self.extraction_config["objective"],
+                    fields=self.extraction_config["fields"]
+                )
+        else:
+            results = extractor.extract_results_from_world(
+                self.world,
+                extraction_objective=self.extraction_config["objective"],
+                fields=self.extraction_config["fields"]
+            )
+        
+        # If fields are specified, ensure they exist in results
+        if results and self.extraction_config["fields"]:
+            for field in self.extraction_config["fields"]:
+                if field not in results:
+                    results[field] = None
+        
+        return results or {}
+    
     def prepare_metadata(self) -> dict:
         """Prepare metadata for database storage"""
         metadata = {
@@ -130,29 +183,15 @@ class GroupDiscussion:
         # Run the discussion
         self.world.run(num_steps)
         
-        # Extract results based on configuration
-        if self.extraction_config["rapporteur_name"]:
-            rapporteur = self.world.get_agent_by_name(self.extraction_config["rapporteur_name"])
-            extractor = ResultsExtractor()
-            extraction_result = extractor.extract_results_from_agent(
-                rapporteur,
-                extraction_objective=self.extraction_config["objective"],
-                situation=self.situation
-            )
-        else:
-            extraction_result = default_extractor.extract_results_from_world(
-                self.world,
-                extraction_objective=self.extraction_config["objective"],
-                fields=self.extraction_config["fields"],
-                verbose=True
-            )
-            
+        # Get results
+        results = self.get_results()
+        
         # Reduce results if requested
         if reduce_results:
             reducer = ResultsReducer()
-            extraction_result = reducer.reduce_results([extraction_result])
+            results = reducer.reduce_results([results])
             
-        return extraction_result
+        return results
     
     def save_results(self, results: Dict[str, Any], output_file: str):
         """Save results to file and database"""
@@ -213,34 +252,44 @@ class ProductBrainstormingDiscussion(GroupDiscussion):
         Please avoid obvious ideas and focus on innovative solutions that could transform how people work.
         """)
         
+        # Update rapporteur name to match the unique agent name
         self.configure_extraction(
             objective="Summarize the ideas that the group came up with, explaining each idea as an item of a list. " \
                      "Describe in details the benefits and drawbacks of each.",
-            rapporteur_name="Lisa"
+            rapporteur_name=f"Lisa_{self.discussion_name}"
         )
 
 class CustomerInterviewDiscussion(GroupDiscussion):
     """Specialized discussion for customer interviews"""
     
     def __init__(self, company_context: str, customer_profile: str):
+        # Create a custom factory for generating agents
+        factory = TinyPersonFactory(company_context)
+        
+        # Call parent class constructor with all required arguments
         super().__init__(
-            "Customer Interview",
-            DiscussionType.INTERVIEW,
-            company_context,
-            custom_factory=TinyPersonFactory(company_context)
+            discussion_name="Customer Interview",
+            discussion_type=DiscussionType.INTERVIEW,
+            context=company_context,
+            custom_factory=factory
         )
         
-        self._generate_customer(customer_profile)
+        # Set up the interview situation
+        self.set_situation(
+            f"""
+            This is a customer interview session. The interviewer will ask questions to understand
+            the customer's needs, pain points, and suggestions.
+            
+            Customer Profile:
+            {customer_profile}
+            """
+        )
+        
+        # Configure how to extract results
         self.configure_extraction(
             objective="Summarize the key insights from the customer interview",
             fields=["pain_points", "needs", "suggestions"]
         )
-        
-    def _generate_customer(self, profile: str):
-        """Generate a customer agent based on the profile"""
-        customer = self.custom_factory.generate_person(profile)
-        self.agents.append(customer)
-        self.world = TinyWorld(self.discussion_name, self.agents)
 
 class AdEvaluationDiscussion(GroupDiscussion):
     """Specialized discussion for evaluating advertisements"""
