@@ -3,8 +3,9 @@ Unit tests for the discussion manager module.
 """
 import unittest
 from unittest.mock import Mock, patch
-from group_cases.src.core.discussion_manager import DiscussionManager
+from group_cases.src.core.discussion_manager import DiscussionManager, Agent, AgentGroup
 from group_cases.src.core.base_discussion import BaseDiscussion, DiscussionType
+from group_cases.src.core.prompt import Prompt
 
 class TestDiscussionManager(unittest.TestCase):
     """Test cases for DiscussionManager class."""
@@ -24,8 +25,8 @@ class TestDiscussionManager(unittest.TestCase):
         self.assertEqual(len(self.manager.agents), 0)
         self.assertIsNone(self.manager.agent_group)
         
-    @patch('tinytroupe.Agent')
-    @patch('tinytroupe.AgentGroup')
+    @patch('group_cases.src.core.discussion_manager.Agent')
+    @patch('group_cases.src.core.discussion_manager.AgentGroup')
     def test_setup_agents(self, mock_agent_group, mock_agent):
         """Test agent setup."""
         # Setup mock agents
@@ -48,14 +49,14 @@ class TestDiscussionManager(unittest.TestCase):
         mock_agent_group.assert_called_once()
         self.assertIsNotNone(self.manager.agent_group)
         
-    @patch('tinytroupe.AgentGroup')
+    @patch('group_cases.src.core.discussion_manager.AgentGroup')
     def test_run_step_without_setup(self, mock_agent_group):
         """Test running step without setup."""
         with self.assertRaises(RuntimeError):
             self.manager.run_step({})
             
-    @patch('tinytroupe.Agent')
-    @patch('tinytroupe.AgentGroup')
+    @patch('group_cases.src.core.discussion_manager.Agent')
+    @patch('group_cases.src.core.discussion_manager.AgentGroup')
     def test_run_step(self, mock_agent_group, mock_agent):
         """Test running a discussion step."""
         # Setup mocks
@@ -104,6 +105,28 @@ class TestDiscussionManager(unittest.TestCase):
         })
         self.assertEqual(default_traits["adaptability"], 0.7)
         self.assertEqual(default_traits["engagement"], 0.8)
+        
+        role = {"name": "TestAgent", "role": "Test Role"}
+        personality = self.manager._generate_personality(role)
+        self.assertIsInstance(personality, dict)
+        self.assertIn("name", personality)
+        self.assertIn("role", personality)
+        
+    def test_create_step_prompt(self):
+        """Test creating step prompt."""
+        context = {
+            "phase": "test_phase",
+            "previous_results": [],
+            "discussion_context": {"key": "value"}
+        }
+        
+        prompt = self.manager._create_step_prompt(context)
+        
+        # Verify prompt structure
+        self.assertIsInstance(prompt, Prompt)
+        self.assertIn("test_phase", prompt.template)
+        self.assertEqual(prompt.variables["phase"], "test_phase")
+        self.assertEqual(prompt.variables["step"], 1)
         
 if __name__ == '__main__':
     unittest.main()

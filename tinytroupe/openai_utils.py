@@ -8,6 +8,7 @@ import logging
 import configparser
 import tiktoken
 from tinytroupe import utils
+from dotenv import load_dotenv
 
 logger = logging.getLogger("tinytroupe")
 
@@ -104,9 +105,26 @@ class OpenAIClient:
     
     def _setup_from_config(self):
         """
-        Sets up the OpenAI API configurations for this client.
+        Setup OpenAI client from configuration.
         """
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"Looking for .env file in: {os.path.abspath('.')}")
+        load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local'))  # Load environment variables from .env.local file
+        api_key = os.getenv("OPENAI_API_KEY")
+        logger.debug(f"API key from environment: {'found' if api_key else 'not found'}")
+        if not api_key:
+            from tinytroupe.utils import read_config_file
+            config = read_config_file()
+            if "OpenAI" in config and "api_key" in config["OpenAI"]:
+                api_key = config["OpenAI"]["api_key"]
+                logger.debug("API key from config file: found")
+            else:
+                logger.debug("API key from config file: not found")
+        
+        if not api_key:
+            raise OpenAIError("The api_key must be set either in config.ini or by setting the OPENAI_API_KEY environment variable")
+        
+        self.client = OpenAI(api_key=api_key)
 
     def send_message(self,
                     current_messages,
@@ -365,9 +383,35 @@ class AzureClient(OpenAIClient):
         Sets up the Azure OpenAI Service API configurations for this client,
         including the API endpoint and key.
         """
-        self.client = AzureOpenAI(azure_endpoint= os.getenv("AZURE_OPENAI_ENDPOINT"),
-                                  api_version = config["OpenAI"]["AZURE_API_VERSION"],
-                                  api_key = os.getenv("AZURE_OPENAI_KEY"))
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"Looking for .env file in: {os.path.abspath('.')}")
+        load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local'))  # Load environment variables from .env.local file
+        api_key = os.getenv("AZURE_OPENAI_KEY")
+        logger.debug(f"API key from environment: {'found' if api_key else 'not found'}")
+        if not api_key:
+            from tinytroupe.utils import read_config_file
+            config = read_config_file()
+            if "OpenAI" in config and "azure_api_key" in config["OpenAI"]:
+                api_key = config["OpenAI"]["azure_api_key"]
+                logger.debug("API key from config file: found")
+            else:
+                logger.debug("API key from config file: not found")
+        
+        if not api_key:
+            raise OpenAIError("The azure_api_key must be set either in config.ini or by setting the AZURE_OPENAI_KEY environment variable")
+        
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION")
+        if not api_version:
+            from tinytroupe.utils import read_config_file
+            config = read_config_file()
+            if "OpenAI" in config and "azure_api_version" in config["OpenAI"]:
+                api_version = config["OpenAI"]["azure_api_version"]
+            else:
+                api_version = "2023-05-15"
+        
+        self.client = AzureOpenAI(azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+                                api_version=api_version,
+                                api_key=api_key)
     
     def _raw_model_call(self, model, chat_api_params):
         """
@@ -483,6 +527,3 @@ def force_default_value(key, value):
 # default client
 register_client("openai", OpenAIClient())
 register_client("azure", AzureClient())
-    
-
-

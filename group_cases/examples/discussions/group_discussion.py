@@ -166,7 +166,7 @@ class GroupDiscussion:
         self.db_manager.store_data(results, metadata)
         
         print(f"Results saved to {output_file} and stored in databases")
-
+        
 class ApartmentAdDiscussion(GroupDiscussion):
     """Specialized discussion for creating apartment advertisements"""
     
@@ -192,7 +192,7 @@ class ApartmentAdDiscussion(GroupDiscussion):
             objective="Compose an advertisement copy based on the ideas given.",
             fields=["ad_copy"]
         )
-
+        
 class ProductBrainstormingDiscussion(GroupDiscussion):
     """Specialized discussion for product feature brainstorming"""
     
@@ -218,7 +218,7 @@ class ProductBrainstormingDiscussion(GroupDiscussion):
                      "Describe in details the benefits and drawbacks of each.",
             rapporteur_name="Lisa"
         )
-
+        
 class CustomerInterviewDiscussion(GroupDiscussion):
     """Specialized discussion for customer interviews"""
     
@@ -241,7 +241,7 @@ class CustomerInterviewDiscussion(GroupDiscussion):
         customer = self.custom_factory.generate_person(profile)
         self.agents.append(customer)
         self.world = TinyWorld(self.discussion_name, self.agents)
-
+        
 class AdEvaluationDiscussion(GroupDiscussion):
     """Specialized discussion for evaluating advertisements"""
     
@@ -269,3 +269,38 @@ class AdEvaluationDiscussion(GroupDiscussion):
             objective="Evaluate each advertisement and recommend the best one",
             fields=["rankings", "analysis", "recommendation"]
         )
+
+def main():
+    # Example 1: Apartment Ad
+    apartment_desc = """
+    Modern 1-bedroom apartment, fully renovated with integrated spaces.
+    Close to medical school, supermarket, and public transport.
+    Furnished with new appliances and elegant design elements.
+    """
+    apt_discussion = ApartmentAdDiscussion(apartment_desc)
+    apt_results = apt_discussion.run_discussion()
+    apt_discussion.save_results(apt_results, "data/extractions/apartment_ad.json")
+    
+    # Example 2: Product Brainstorming
+    product_discussion = ProductBrainstormingDiscussion("Microsoft Word", "office productivity")
+    product_results = product_discussion.run_discussion(num_steps=4)
+    product_discussion.save_results(product_results, "data/extractions/word_features.json")
+    
+    # Example 3: Customer Interview
+    company_context = "Large bank facing fintech competition"
+    customer_profile = "VP of Innovation with engineering background and MBA"
+    interview = CustomerInterviewDiscussion(company_context, customer_profile)
+    interview_results = interview.run_discussion(num_steps=5)
+    interview.save_results(interview_results, "data/extractions/customer_interview.json")
+    
+    # Example 4: Ad Evaluation
+    tv_ads = [
+        "Premium 4K OLED TV with infinite contrast...",
+        "Next-gen QLED display with quantum processing..."
+    ]
+    ad_eval = AdEvaluationDiscussion("Television", tv_ads)
+    eval_results = ad_eval.run_discussion(reduce_results=True)
+    ad_eval.save_results(eval_results, "data/extractions/tv_ad_evaluation.json")
+
+if __name__ == "__main__":
+    main()

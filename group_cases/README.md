@@ -4,27 +4,65 @@
 
 Group Cases is an advanced collaborative discussion and analysis framework designed to facilitate complex group interactions, knowledge management, and insights generation.
 
+## Project Structure
+
+```
+group_cases/
+├── docs/               # Documentation files
+├── examples/           # Example implementations
+│   ├── advertisements/  # Advertisement generation examples
+│   ├── discussions/     # Group discussion examples
+│   └── utils/           # Utility examples
+├── src/                # Source code
+│   ├── core/           # Core functionality
+│   ├── tools/          # Tools and utilities
+│   └── streamlit_app.py # Main Streamlit application
+└── tests/              # Test files
+```
+
 ## Key Components
 
-### 1. Chat Interface (`tools/chat_interface.py`)
-- Advanced messaging system
-- Support for multiple message types
-- Threading capabilities
-- Reaction mechanisms
-- User activity tracking
+### 1. Core Components (`src/core/`)
+- Character and group management
+- Discussion frameworks
+- Memory and context handling
 
-### 2. Discussion Analytics (`tools/advanced_analytics.py`)
-- Comprehensive discussion dynamics analysis
-- Participation metrics
-- Topic evolution tracking
-- Sentiment analysis
-- Interaction pattern recognition
+### 2. Tools (`src/tools/`)
+- Chat Interface (`chat_interface.py`)
+  - Advanced messaging system
+  - Support for multiple message types
+  - Threading capabilities
+- Analytics (`advanced_analytics.py`)
+  - Discussion dynamics analysis
+  - Sentiment analysis
+  - Interaction patterns
+- Word Processing (`word_processor.py`)
+  - Text processing utilities
+  - Document generation
 
 ### 3. Streamlit Frontend (`src/streamlit_app.py`)
 - Interactive chat interface
-- Real-time message display
-- User customization
-- Potential for analytics visualization
+- Real-time analytics dashboard
+- User customization options
+- Discussion visualization
+
+## Examples
+
+### Advertisement Generation
+- TV advertisement creation
+- Real estate listing generation
+- Travel advertisement creation
+
+### Group Discussions
+- Focus group management
+- Product brainstorming
+- Customer interviews
+- Design reviews
+
+### Utilities
+- Chat viewing and analysis
+- Database utilities
+- Synthetic data generation
 
 ## Installation
 
@@ -39,42 +77,23 @@ cd TinyTroupe
 pip install -e .
 ```
 
-## Usage Examples
+## Usage
 
-### Basic Chat Interface
+See the `examples/` directory for detailed usage examples in different scenarios.
 
-```python
-from group_cases.src.tools.chat_interface import ChatInterface, MessageType
+For a quick start, run the Streamlit application:
 
-# Initialize chat interface
-chat = ChatInterface()
-
-# Add messages
-chat.add_message(
-    sender="Alice", 
-    content="Hello, everyone!", 
-    msg_type=MessageType.TEXT
-)
-
-# Create a thread
-thread_id = chat.create_thread(0)  # Create thread from first message
-
-# Add reactions
-chat.add_reaction(
-    message_index=0, 
-    user="Bob", 
-    reaction="👍"
-)
+```bash
+streamlit run group_cases/src/streamlit_app.py
 ```
 
-### Advanced Analytics
+## Documentation
 
-```python
-# Get discussion analytics
-analytics = chat.get_analytics()
-print(analytics['total_messages'])
-print(analytics['messages_per_user'])
-```
+Detailed documentation is available in the `docs/` directory:
+- Quick Start Guide
+- Analytics Documentation
+- API Reference
+- Example Use Cases
 
 ## Features
 
